@@ -276,7 +276,7 @@ Options:
     --seed=<#>      Seed for driving faults [default: None].
     --clients=<#>   Number of concurrent clients [default: 2].
     --servers=<#>   Number of cluster servers [default: 3].
-    --steps=<#>     Number of steps to take [default: 1000].
+    --steps=<#>     Number of steps to take [default: 10000].
 ";
 
 struct Args {
@@ -294,7 +294,7 @@ impl Default for Args {
             seed: None,
             clients: 2,
             servers: 3,
-            steps: 1000,
+            steps: 10000,
         }
     }
 }
