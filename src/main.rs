@@ -102,6 +102,7 @@ impl Cluster {
         println!("restarting server {}", idx);
 
         self.servers[idx].restart();
+        self.paused.remove(&idx);
     }
 
     fn pause_server(&mut self) {
@@ -116,6 +117,15 @@ impl Cluster {
         }
 
         println!("pausing server {}", idx);
+
+        let pid = self.servers[idx].child.as_ref().unwrap().id();
+
+        unsafe {
+            if libc::kill(pid as libc::pid_t, libc::SIGSTOP) != 0 {
+                panic!("{:?}", io::Error::last_os_error());
+            }
+        }
+
         self.paused.insert(idx);
     }
 
@@ -128,6 +138,15 @@ impl Cluster {
         let idx = *self.paused.iter().choose(&mut self.rng).unwrap();
 
         println!("resuming server {}", idx);
+
+        let pid = self.servers[idx].child.as_ref().unwrap().id();
+
+        unsafe {
+            if libc::kill(pid as libc::pid_t, libc::SIGCONT) != 0 {
+                panic!("{:?}", io::Error::last_os_error());
+            }
+        }
+
         self.paused.remove(&idx);
     }
 
