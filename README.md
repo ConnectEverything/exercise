@@ -21,8 +21,8 @@ A lightweight fault injection tool for quickly checking
   consumer info should reflect this acknowledged progress
   regardless of subsets of servers restarting.
 
-Works by sending servers streams of SIGSTOP/SIGCONT signals
-that pause and resume their processes in funky orders, while
-paying attention to high-level client progress metrics to ensure
-that the cluster does not fail to recover after a deadline, and
-to throttle the pauses slowly enough for some progress to happen.
+Works by sending servers streams of SIGKILL/SIGSTOP/SIGCONT signals
+that kill/pause/resume their processes in funky orders, while
+paying attention to high-level client invariants and progress metrics
+to ensure that the cluster does not fail to recover after a deadline,
+and to throttle the pauses slowly enough for some progress to happen.

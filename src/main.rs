@@ -1,9 +1,18 @@
 use std::io;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+
+use rand::{thread_rng, Rng};
 
 use nats::jetstream::{
     ConsumerInfo, RetentionPolicy, StreamConfig, StreamInfo,
 };
+
+struct Cluster {
+    clients: Vec<nats::Connection>,
+    servers: Vec<Server>,
+    seed: u64,
+}
 
 struct Server {
     child: Child,
@@ -26,14 +35,14 @@ impl Drop for Server {
 }
 
 /// Starts a local NATS server that gets killed on drop.
-fn server(idx: u16) -> Server {
+fn server<P: AsRef<Path>>(path: P, idx: u16) -> Server {
     let port = idx + 44000;
     let storage_dir = format!("jetstream_test_{}", idx);
     let _ = std::fs::remove_dir_all(&storage_dir);
 
     let supercluster_conf = format!("confs/supercluster_{}.conf", idx);
 
-    let child = Command::new("nats-server")
+    let child = Command::new(path.as_ref())
         .args(&["--port", &port.to_string()])
         .arg("-js")
         .args(&["-sd", &storage_dir])
@@ -46,10 +55,55 @@ fn server(idx: u16) -> Server {
     Server { child, port, storage_dir }
 }
 
+const USAGE: &str = "
+Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
+
+Options:
+    --path=<p>      Path to nats-server binary [default: nats-server].
+    --seed=<#>      Seed for driving faults [default: None].
+";
+
+struct Args {
+    path: PathBuf,
+    seed: Option<u64>,
+}
+
+impl Default for Args {
+    fn default() -> Args {
+        Args { path: "nats-server".into(), seed: None }
+    }
+}
+
+fn parse<'a, I, T>(mut iter: I) -> T
+where
+    I: Iterator<Item = &'a str>,
+    T: std::str::FromStr,
+    <T as std::str::FromStr>::Err: std::fmt::Debug,
+{
+    iter.next().expect(USAGE).parse().expect(USAGE)
+}
+
+impl Args {
+    fn parse() -> Args {
+        let mut args = Args::default();
+        for raw_arg in std::env::args().skip(1) {
+            let mut splits = raw_arg[2..].split('=');
+            match splits.next().unwrap() {
+                "path" => args.path = parse(&mut splits),
+                "seed" => args.seed = Some(parse(&mut splits)),
+                other => panic!("unknown option: {}, {}", other, USAGE),
+            }
+        }
+        args
+    }
+}
+
 fn main() {
-    let s0 = server(0);
-    let s1 = server(1);
-    let s2 = server(2);
+    let args = Args::parse();
+
+    let s0 = server(&args.path, 0);
+    let s1 = server(&args.path, 1);
+    let s2 = server(&args.path, 2);
 
     let nc = s0.nc();
 
