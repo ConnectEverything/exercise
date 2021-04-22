@@ -1,7 +1,9 @@
+use std::collections::HashSet;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 
+use rand::seq::IteratorRandom;
 use rand::{thread_rng, Rng};
 
 use nats::jetstream::{
@@ -11,7 +13,79 @@ use nats::jetstream::{
 struct Cluster {
     clients: Vec<nats::Connection>,
     servers: Vec<Server>,
+    paused: HashSet<usize>,
     seed: u64,
+}
+
+impl Cluster {
+    fn start(args: &Args) -> Cluster {
+        let servers: Vec<Server> =
+            (0..args.servers).map(|i| server(&args.path, i as u16)).collect();
+
+        let clients: Vec<nats::Connection> = servers
+            .iter()
+            .cycle()
+            .take(args.clients as usize)
+            .map(|s| s.nc())
+            .collect();
+
+        let seed = args.seed.unwrap_or(thread_rng().gen());
+
+        println!("Starting cluster exerciser with seed {}", seed);
+
+        Cluster { servers, clients, seed, paused: Default::default() }
+    }
+
+    fn step(&mut self) {
+        match thread_rng().gen_range(0..50) {
+            0 => self.restart_server(),
+            1..=4 => self.pause_server(),
+            5..=9 => self.resume_server(),
+            10..=29 => self.publish(),
+            30..=49 => self.consume(),
+            _ => unreachable!("impossible choice"),
+        }
+    }
+
+    fn restart_server(&mut self) {
+        let idx = thread_rng().gen_range(0..self.servers.len());
+        println!("restarting server {}", idx);
+    }
+
+    fn pause_server(&mut self) {
+        if self.paused.len() == self.servers.len() {
+            // all servers already paused
+            return;
+        }
+        let mut idx = thread_rng().gen_range(0..self.servers.len());
+
+        while self.paused.contains(&idx) {
+            idx = thread_rng().gen_range(0..self.servers.len());
+        }
+
+        println!("pausing server {}", idx);
+        self.paused.insert(idx);
+    }
+
+    fn resume_server(&mut self) {
+        if self.paused.is_empty() {
+            // nothing ot resume
+            return;
+        }
+
+        let idx = *self.paused.iter().choose(&mut thread_rng()).unwrap();
+
+        println!("resuming server {}", idx);
+        self.paused.remove(&idx);
+    }
+
+    fn publish(&mut self) {
+        println!("publishing message");
+    }
+
+    fn consume(&mut self) {
+        println!("consuming message");
+    }
 }
 
 struct Server {
@@ -56,21 +130,33 @@ fn server<P: AsRef<Path>>(path: P, idx: u16) -> Server {
 }
 
 const USAGE: &str = "
-Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
+Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>] [--clients=<#>] [--servers=<#>] [--steps=<#>]
 
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
     --seed=<#>      Seed for driving faults [default: None].
+    --clients=<#>   Number of concurrent clients [default: 2].
+    --servers=<#>   Number of cluster servers [default: 3].
+    --steps=<#>     Number of steps to take [default: 1000].
 ";
 
 struct Args {
     path: PathBuf,
     seed: Option<u64>,
+    clients: u8,
+    servers: u8,
+    steps: u64,
 }
 
 impl Default for Args {
     fn default() -> Args {
-        Args { path: "nats-server".into(), seed: None }
+        Args {
+            path: "nats-server".into(),
+            seed: None,
+            clients: 2,
+            servers: 3,
+            steps: 1000,
+        }
     }
 }
 
@@ -91,6 +177,9 @@ impl Args {
             match splits.next().unwrap() {
                 "path" => args.path = parse(&mut splits),
                 "seed" => args.seed = Some(parse(&mut splits)),
+                "clients" => args.clients = parse(&mut splits),
+                "servers" => args.servers = parse(&mut splits),
+                "steps" => args.steps = parse(&mut splits),
                 other => panic!("unknown option: {}, {}", other, USAGE),
             }
         }
@@ -101,12 +190,13 @@ impl Args {
 fn main() {
     let args = Args::parse();
 
-    let s0 = server(&args.path, 0);
-    let s1 = server(&args.path, 1);
-    let s2 = server(&args.path, 2);
+    let mut cluster = Cluster::start(&args);
 
-    let nc = s0.nc();
+    for _ in 0..args.steps {
+        cluster.step();
+    }
 
+    /*
     nc.stream_info("test1").expect("couldn't get info (2)");
     let _ = nc.delete_stream("test1");
 
@@ -186,4 +276,5 @@ fn main() {
 
         nc.delete_stream(&stream.config.name).expect("couldn't delete stream");
     }
+    */
 }
