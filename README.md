@@ -15,13 +15,6 @@ Options:
     --steps=<#>     Number of steps to take [default: 1000].
 ```
 
-## (super)cluster liveness
-
-Liveness is assessed as it relates to NATS clustering and superclusters.
-
-* If all injected faults have been cleared, the cluster should reach a "functional state" after a maximum time bound.
-* "functional state" means that standard NATS messages should flow across leaf, gateway, cluster, etc... boundaries.
-
 ## message durability model
 
 Durability is assessed as it relates to JetStream.
@@ -36,30 +29,19 @@ Durability is assessed as it relates to JetStream.
 * successfully Purging, deleting, and discarding messages due to surpassing configured limits causes durable messages to permanently be set to non-present
 * if a purge or deletion occurs and it is not successful due to a timeout, the related message is moved back to the uncertain state
 
-## message invariants
+## invariants
 
 * Durable messages must always be read by consumers in the same order (they form a total order)
 * Non-present messages must never be read by consumers
-
-## stream invariants
-
 * replica changes should have zero impact on observed
   consumer orderings, durability, etc...
-* when a stream of a certain name is created and
-  deleted sequentially but using separate clients,
-  the presence or absence of a stream should always
-  match the last action known to complete sequentially.
-* when a consumer of a certain name is created and
-  deleted sequentially but using separate clients,
-  the presence or absence of a stream should always
-  match the last action known to complete sequentially.
-* when a consumer has processed a subset of messages
-  and double-acked their progress to the server, the
-  consumer info should reflect this acknowledged progress
-  regardless of subsets of servers restarting.
-* after a maximum "quiescence" period, consumer and stream
-  info must match expectations derived from the message
-  durability model.
+* Over time, other invariants related to replica assignment,
+  (super)cluster liveness, stream creation/deletion, and
+  consumer creation/deletion will be added. Many bugs in
+  sharded linearizable systems happen in the metadata
+  management that configures the linearizable log parts,
+  so we will want to exercise these as well once we are
+  able to get this tool to pass most of the time.
 
 ## fault injection strategy
 
