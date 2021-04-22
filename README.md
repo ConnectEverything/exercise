@@ -26,14 +26,14 @@ Durability is assessed as it relates to JetStream.
   * if a consumer reads a message, it is marked as durable and its total ordering for the stream is established
   * if a consumer reads a later message without this one, the expected early message is marked non-present
 * Once a message's durability has been ascertained, it must continue to be read in the known durable order by other consumers
-* successfully Purging, deleting, and discarding messages due to surpassing configured limits causes durable messages to permanently be set to non-present
-* if a purge or deletion occurs and it is not successful due to a timeout, the related message is moved back to the uncertain state
+* Successfully Purging, deleting, and discarding messages due to surpassing configured limits causes durable messages to permanently be set to non-present
+* If a purge or deletion occurs and it is not successful due to a timeout, the related message is moved back to the uncertain state
 
 ## invariants
 
 * Durable messages must always be read by consumers in the same order (they form a total order)
 * Non-present messages must never be read by consumers
-* replica changes should have zero impact on observed
+* Replica changes should have zero impact on observed
   consumer orderings, durability, etc...
 * Over time, other invariants related to replica assignment,
   (super)cluster liveness, stream creation/deletion, and
