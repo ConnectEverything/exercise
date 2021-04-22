@@ -100,6 +100,8 @@ impl Cluster {
     fn restart_server(&mut self) {
         let idx = self.rng.gen_range(0..self.servers.len());
         println!("restarting server {}", idx);
+
+        self.servers[idx].restart();
     }
 
     fn pause_server(&mut self) {
@@ -177,21 +179,33 @@ impl Cluster {
 }
 
 struct Server {
-    child: Child,
+    child: Option<Child>,
     port: u16,
     storage_dir: String,
+    path: PathBuf,
+    idx: u16,
 }
 
 impl Server {
     fn nc(&self) -> nats::Connection {
         nats::connect(&format!("localhost:{}", self.port)).unwrap()
     }
+
+    fn restart(&mut self) {
+        let mut child = self.child.take().unwrap();
+        child.kill().unwrap();
+        child.wait().unwrap();
+
+        *self = server(&self.path, self.idx);
+    }
 }
 
 impl Drop for Server {
     fn drop(&mut self) {
-        self.child.kill().unwrap();
-        self.child.wait().unwrap();
+        if let Some(mut child) = self.child.take() {
+            child.kill().unwrap();
+            child.wait().unwrap();
+        }
         let _ = std::fs::remove_dir_all(&self.storage_dir);
     }
 }
@@ -214,7 +228,13 @@ fn server<P: AsRef<Path>>(path: P, idx: u16) -> Server {
         .spawn()
         .expect("unable to spawn nats-server");
 
-    Server { child, port, storage_dir }
+    Server {
+        child: Some(child),
+        port,
+        storage_dir,
+        path: path.as_ref().into(),
+        idx,
+    }
 }
 
 struct Consumer {
