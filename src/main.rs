@@ -274,7 +274,7 @@ Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>] [--clients=<#>] [--
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
     --seed=<#>      Seed for driving faults [default: None].
-    --clients=<#>   Number of concurrent clients [default: 2].
+    --clients=<#>   Number of concurrent clients [default: 3].
     --servers=<#>   Number of cluster servers [default: 3].
     --steps=<#>     Number of steps to take [default: 10000].
 ";
@@ -292,7 +292,7 @@ impl Default for Args {
         Args {
             path: "nats-server".into(),
             seed: None,
-            clients: 2,
+            clients: 3,
             servers: 3,
             steps: 10000,
         }
