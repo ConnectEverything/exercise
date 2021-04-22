@@ -4,6 +4,17 @@ A lightweight black-box fault injection tool for quickly
 checking `nats-server` binaries for various invariants
 related to (super)cluster liveness and JS durability.
 
+```
+Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
+                [--clients=<#>] [--servers=<#>] [--steps=<#>]
+Options:
+    --path=<p>      Path to nats-server binary [default: nats-server].
+    --seed=<#>      Seed for driving faults [default: None].
+    --clients=<#>   Number of concurrent clients [default: 2].
+    --servers=<#>   Number of cluster servers [default: 3].
+    --steps=<#>     Number of steps to take [default: 1000].
+```
+
 ## (super)cluster liveness
 
 Liveness is assessed as it relates to NATS clustering and superclusters.
