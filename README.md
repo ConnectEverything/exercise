@@ -4,6 +4,8 @@ A lightweight black-box fault injection tool for quickly
 checking `nats-server` binaries for various invariants
 related to (super)cluster liveness and JS durability.
 
+(currently needs to be run from this repo's root directory)
+
 ```
 Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
                 [--clients=<#>] [--servers=<#>] [--steps=<#>]
