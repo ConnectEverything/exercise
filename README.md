@@ -11,10 +11,10 @@ Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
                 [--clients=<#>] [--servers=<#>] [--steps=<#>]
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
-    --seed=<#>      Seed for driving faults [default: None].
-    --clients=<#>   Number of concurrent clients [default: 2].
+    --seed=<#>      Seed for replaying faults [default: None].
+    --clients=<#>   Number of concurrent clients [default: 3].
     --servers=<#>   Number of cluster servers [default: 3].
-    --steps=<#>     Number of steps to take [default: 1000].
+    --steps=<#>     Number of steps to take [default: 10000].
 ```
 
 ## message durability model

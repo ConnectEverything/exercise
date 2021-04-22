@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 
-use nats::jetstream::{RetentionPolicy, StreamConfig};
+use nats::jetstream::{ConsumerConfig, RetentionPolicy, StreamConfig};
 
 const STREAM: &str = "exercise_stream";
 
@@ -65,9 +65,14 @@ impl Cluster {
                 println!("creating testing consumer {}", consumer_name);
 
                 let nc = s.nc();
+                let conf = ConsumerConfig {
+                    filter_subject: Some(consumer_name.clone()),
+                    durable_name: consumer_name.into(),
+                    ..Default::default()
+                };
                 Consumer {
                     inner: nc
-                        .create_consumer(STREAM, &*consumer_name)
+                        .create_consumer(STREAM, conf)
                         .expect("couldn't create consumer"),
                     observed: vec![],
                     id,
@@ -273,7 +278,7 @@ Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>] [--clients=<#>] [--
 
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
-    --seed=<#>      Seed for driving faults [default: None].
+    --seed=<#>      Seed for replaying faults [default: None].
     --clients=<#>   Number of concurrent clients [default: 3].
     --servers=<#>   Number of cluster servers [default: 3].
     --steps=<#>     Number of steps to take [default: 10000].
