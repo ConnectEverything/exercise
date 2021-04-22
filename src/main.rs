@@ -1,43 +1,92 @@
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
+use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
 
-use rand::seq::IteratorRandom;
-use rand::{thread_rng, Rng};
+use rand::seq::{IteratorRandom, SliceRandom};
+use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
 
-use nats::jetstream::{
-    ConsumerInfo, RetentionPolicy, StreamConfig, StreamInfo,
-};
+use nats::jetstream::{RetentionPolicy, StreamConfig};
+
+const STREAM: &str = "exercise_stream";
+
+fn idgen() -> u64 {
+    static IDGEN: AtomicU64 = AtomicU64::new(0);
+    IDGEN.fetch_add(1, SeqCst)
+}
 
 struct Cluster {
-    clients: Vec<nats::Connection>,
+    clients: Vec<Consumer>,
     servers: Vec<Server>,
     paused: HashSet<usize>,
-    seed: u64,
+    rng: StdRng,
+    unvalidated_consumers: HashSet<usize>,
+    durability_model: DurabilityModel,
 }
 
 impl Cluster {
     fn start(args: &Args) -> Cluster {
-        let servers: Vec<Server> =
-            (0..args.servers).map(|i| server(&args.path, i as u16)).collect();
-
-        let clients: Vec<nats::Connection> = servers
-            .iter()
-            .cycle()
-            .take(args.clients as usize)
-            .map(|s| s.nc())
-            .collect();
-
         let seed = args.seed.unwrap_or(thread_rng().gen());
 
         println!("Starting cluster exerciser with seed {}", seed);
 
-        Cluster { servers, clients, seed, paused: Default::default() }
+        let rng = SeedableRng::seed_from_u64(seed);
+
+        let servers: Vec<Server> =
+            (0..args.servers).map(|i| server(&args.path, i as u16)).collect();
+
+        // let servers come up
+        std::thread::sleep(std::time::Duration::from_millis(1000));
+
+        println!("creating testing stream {}", STREAM);
+
+        {
+            let nc = servers[0].nc();
+
+            let _ = nc.delete_stream(STREAM);
+
+            nc.create_stream(StreamConfig {
+                name: STREAM.to_string(),
+                retention: RetentionPolicy::WorkQueue,
+                ..Default::default()
+            })
+            .expect("couldn't create exercise_stream");
+        }
+
+        let clients: Vec<Consumer> = servers
+            .iter()
+            .cycle()
+            .enumerate()
+            .take(args.clients as usize)
+            .map(|(id, s)| {
+                let consumer_name = format!("consumer_{}", id);
+                println!("creating testing consumer {}", consumer_name);
+
+                let nc = s.nc();
+                Consumer {
+                    inner: nc
+                        .create_consumer(STREAM, &*consumer_name)
+                        .expect("couldn't create consumer"),
+                    observed: vec![],
+                    id,
+                }
+            })
+            .collect();
+
+        Cluster {
+            servers,
+            clients,
+            rng: rng,
+            paused: Default::default(),
+            durability_model: Default::default(),
+            unvalidated_consumers: Default::default(),
+        }
     }
 
     fn step(&mut self) {
-        match thread_rng().gen_range(0..50) {
+        match self.rng.gen_range(0..50) {
             0 => self.restart_server(),
             1..=4 => self.pause_server(),
             5..=9 => self.resume_server(),
@@ -45,10 +94,11 @@ impl Cluster {
             30..=49 => self.consume(),
             _ => unreachable!("impossible choice"),
         }
+        self.validate();
     }
 
     fn restart_server(&mut self) {
-        let idx = thread_rng().gen_range(0..self.servers.len());
+        let idx = self.rng.gen_range(0..self.servers.len());
         println!("restarting server {}", idx);
     }
 
@@ -57,10 +107,10 @@ impl Cluster {
             // all servers already paused
             return;
         }
-        let mut idx = thread_rng().gen_range(0..self.servers.len());
+        let mut idx = self.rng.gen_range(0..self.servers.len());
 
         while self.paused.contains(&idx) {
-            idx = thread_rng().gen_range(0..self.servers.len());
+            idx = self.rng.gen_range(0..self.servers.len());
         }
 
         println!("pausing server {}", idx);
@@ -80,11 +130,49 @@ impl Cluster {
     }
 
     fn publish(&mut self) {
-        println!("publishing message");
+        let c = self.clients.choose(&mut thread_rng()).unwrap();
+        println!("publishing message by client {}", c.id);
+        let data = idgen().to_le_bytes();
+        c.inner.nc.publish(STREAM, data).unwrap();
     }
 
     fn consume(&mut self) {
-        println!("consuming message");
+        let c = self.clients.choose_mut(&mut thread_rng()).unwrap();
+        println!("consuming message by client {}", c.id);
+
+        let proc_ret: io::Result<u64> = c.inner.process_timeout(|msg| {
+            let id = u64::from_le_bytes((&*msg.data).try_into().unwrap());
+            Ok(id)
+        });
+
+        if let Ok(id) = proc_ret {
+            c.observed.push(id);
+            self.unvalidated_consumers.insert(c.id);
+        }
+    }
+
+    fn validate(&mut self) {
+        // assert all consumers have witnessed messages in the correct order
+        let unvalidated_consumers =
+            std::mem::take(&mut self.unvalidated_consumers);
+
+        for id in unvalidated_consumers {
+            let c = &mut self.clients[id];
+            let client_len = c.observed.len();
+            let cluster_len = self.durability_model.observed.len();
+            let shared_len = cluster_len.min(client_len);
+            assert_eq!(
+                self.durability_model.observed[..shared_len],
+                c.observed[..shared_len],
+                "observed messages must occur in the same order for all consumers",
+            );
+
+            if client_len > cluster_len {
+                self.durability_model
+                    .observed
+                    .extend_from_slice(&c.observed[shared_len..]);
+            }
+        }
     }
 }
 
@@ -127,6 +215,18 @@ fn server<P: AsRef<Path>>(path: P, idx: u16) -> Server {
         .expect("unable to spawn nats-server");
 
     Server { child, port, storage_dir }
+}
+
+struct Consumer {
+    inner: nats::jetstream::Consumer,
+    observed: Vec<u64>,
+    id: usize,
+}
+
+// every message
+#[derive(Default, Debug)]
+struct DurabilityModel {
+    observed: Vec<u64>,
 }
 
 const USAGE: &str = "
@@ -195,86 +295,4 @@ fn main() {
     for _ in 0..args.steps {
         cluster.step();
     }
-
-    /*
-    nc.stream_info("test1").expect("couldn't get info (2)");
-    let _ = nc.delete_stream("test1");
-
-    nc.create_stream(StreamConfig {
-        name: "test1".to_string(),
-        retention: RetentionPolicy::WorkQueue,
-        ..Default::default()
-    })
-    .expect("couldn't create test1 stream");
-
-    let mut consumer = nc
-        .create_consumer("test1", "consumer1")
-        .expect("couldn't create consumer");
-
-    for i in 1..=1000 {
-        nc.publish("test1", format!("{}", i)).expect("couldn't publish");
-    }
-
-    assert_eq!(
-        nc.stream_info("test1")
-            .expect("couldn't get stream info")
-            .state
-            .messages,
-        1000
-    );
-
-    for _ in 1..=1000 {
-        consumer.process(|_msg| Ok(())).expect("couldn't process single");
-    }
-
-    let mut count = 0;
-    while count != 1000 {
-        let _: Vec<()> = consumer
-            .process_batch(128, |_msg| {
-                count += 1;
-                Ok(())
-            })
-            .into_iter()
-            .collect::<std::io::Result<Vec<()>>>()
-            .expect("couldn't process batch");
-    }
-    assert_eq!(count, 1000);
-
-    // sequence numbers start with 1
-    for i in 1..=500 {
-        nc.delete_message("test1", i).expect("couldn't delete");
-    }
-
-    assert_eq!(
-        nc.stream_info("test1").expect("couldn't get info (2)").state.messages,
-        500
-    );
-
-    // cleanup
-    let streams: io::Result<Vec<StreamInfo>> = nc.list_streams().collect();
-
-    for stream in streams.expect("couldn't get stream list") {
-        let consumers: io::Result<Vec<ConsumerInfo>> = nc
-            .list_consumers(&stream.config.name)
-            .expect("couldn't list consumers (1)")
-            .collect();
-
-        for consumer in consumers.expect("couldn't list consumers (2)") {
-            nc.delete_consumer(&stream.config.name, &consumer.name)
-                .expect("couldn't delete consumer");
-        }
-
-        nc.purge_stream(&stream.config.name).expect("couldn't purge stream");
-
-        assert_eq!(
-            nc.stream_info(&stream.config.name)
-                .expect("couldn't get stream info (3)")
-                .state
-                .messages,
-            0
-        );
-
-        nc.delete_stream(&stream.config.name).expect("couldn't delete stream");
-    }
-    */
 }
