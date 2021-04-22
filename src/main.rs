@@ -6,7 +6,7 @@ use std::process::{Child, Command};
 use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
 
 use rand::seq::{IteratorRandom, SliceRandom};
-use rand::{rngs::StdRng, thread_rng, Rng, SeedableRng};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 
 use nats::jetstream::{RetentionPolicy, StreamConfig};
 
@@ -28,7 +28,7 @@ struct Cluster {
 
 impl Cluster {
     fn start(args: &Args) -> Cluster {
-        let seed = args.seed.unwrap_or(thread_rng().gen());
+        let seed = args.seed.unwrap_or(rand::thread_rng().gen());
 
         println!("Starting cluster exerciser with seed {}", seed);
 
@@ -123,21 +123,21 @@ impl Cluster {
             return;
         }
 
-        let idx = *self.paused.iter().choose(&mut thread_rng()).unwrap();
+        let idx = *self.paused.iter().choose(&mut self.rng).unwrap();
 
         println!("resuming server {}", idx);
         self.paused.remove(&idx);
     }
 
     fn publish(&mut self) {
-        let c = self.clients.choose(&mut thread_rng()).unwrap();
+        let c = self.clients.choose(&mut self.rng).unwrap();
         println!("publishing message by client {}", c.id);
         let data = idgen().to_le_bytes();
         c.inner.nc.publish(STREAM, data).unwrap();
     }
 
     fn consume(&mut self) {
-        let c = self.clients.choose_mut(&mut thread_rng()).unwrap();
+        let c = self.clients.choose_mut(&mut self.rng).unwrap();
         println!("consuming message by client {}", c.id);
 
         let proc_ret: io::Result<u64> = c.inner.process_timeout(|msg| {
