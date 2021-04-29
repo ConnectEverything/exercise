@@ -202,15 +202,25 @@ impl Cluster {
 
             for (id, value) in observed {
                 if let Some(old_value) = self.durability_model.observed.insert(id, value) {
-                    assert_eq!(
-                        value, old_value,
-                        "different consumers received \
-                        different values for the same \
-                        stream sequence. stream sequence: {} \
-                        first observed value: {}, second observed value: {}. \
-                        schedule replay seed: {}",
-                        id, old_value, value, self.args.seed
-                    );
+                    if value != old_value {
+                        eprintln!(
+                            "
+                            Correctness violation detected after running for {:?}.
+                            Consumers received different values for the same \
+                            stream sequence.
+                                stream sequence: {}
+                                first observed value: {}
+                                second observed value: {}
+                                schedule replay seed: {}
+                            ",
+                            self.args.start_time.elapsed(),
+                            id,
+                            old_value,
+                            value,
+                            self.args.seed
+                        );
+                        std::process::exit(1);
+                    }
                 }
             }
         }
@@ -309,6 +319,7 @@ struct Args {
     steps: u64,
     num_replicas: usize,
     no_kill: bool,
+    start_time: std::time::Instant,
 }
 
 impl Default for Args {
@@ -321,6 +332,7 @@ impl Default for Args {
             steps: 10000,
             num_replicas: 1,
             no_kill: false,
+            start_time: std::time::Instant::now(),
         }
     }
 }
