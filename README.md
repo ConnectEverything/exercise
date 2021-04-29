@@ -7,8 +7,8 @@ related to (super)cluster liveness and JS durability.
 (currently needs to be run from this repo's root directory)
 
 ```
-Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>]
-                [--clients=<#>] [--servers=<#>] [--steps=<#>]
+Usage: exercise [--path=</path/to/nats-server>]
+
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
     --seed=<#>      Seed for replaying faults [default: None].
@@ -17,6 +17,7 @@ Options:
     --steps=<#>     Number of steps to take [default: 10000].
     --replicas=<#>  Number of replicas for the JetStream test stream [default: 1].
     --no-kill       Do not restart servers, just pause/resume them [default: unset].
+    --burn-in       Ignore steps and run tests until we crash [default: unset].
 ```
 
 ## message durability model

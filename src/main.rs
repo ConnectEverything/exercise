@@ -290,7 +290,7 @@ struct DurabilityModel {
 }
 
 const USAGE: &str = "
-Usage: exercise [--path=</path/to/nats-server>] [--seed=<#>] [--clients=<#>] [--servers=<#>] [--steps=<#>]
+Usage: exercise [--path=</path/to/nats-server>]
 
 Options:
     --path=<p>      Path to nats-server binary [default: nats-server].
@@ -300,6 +300,7 @@ Options:
     --steps=<#>     Number of steps to take [default: 10000].
     --replicas=<#>  Number of replicas for the JetStream test stream [default: 1].
     --no-kill       Do not restart servers, just pause/resume them [default: unset].
+    --burn-in       Ignore steps and run tests until we crash [default: unset].
 ";
 
 struct Args {
@@ -310,6 +311,7 @@ struct Args {
     steps: u64,
     num_replicas: usize,
     no_kill: bool,
+    burn_in: bool,
     start_time: std::time::Instant,
 }
 
@@ -323,6 +325,7 @@ impl Default for Args {
             steps: 10000,
             num_replicas: 1,
             no_kill: false,
+            burn_in: false,
             start_time: std::time::Instant::now(),
         }
     }
@@ -360,7 +363,8 @@ impl Args {
 fn main() {
     let args = Args::parse();
 
-    let steps = args.steps;
+    let steps = if args.burn_in { u64::MAX } else { args.steps };
+
     let mut cluster = Cluster::start(args);
 
     for _ in 0..steps {
