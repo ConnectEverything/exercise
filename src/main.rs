@@ -22,13 +22,14 @@ struct Cluster {
     clients: Vec<Consumer>,
     servers: Vec<Server>,
     paused: HashSet<usize>,
+    args: Args,
     rng: StdRng,
     unvalidated_consumers: HashSet<usize>,
     durability_model: DurabilityModel,
 }
 
 impl Cluster {
-    fn start(args: &Args) -> Cluster {
+    fn start(args: Args) -> Cluster {
         let seed = args.seed.unwrap_or(rand::thread_rng().gen());
 
         println!("Starting cluster exerciser with seed {}", seed);
@@ -50,6 +51,7 @@ impl Cluster {
             let _ = nc.delete_stream(STREAM);
 
             nc.create_stream(StreamConfig {
+                num_replicas: args.num_replicas,
                 name: STREAM.to_string(),
                 retention: RetentionPolicy::Limits,
                 ..Default::default()
@@ -86,6 +88,7 @@ impl Cluster {
             servers,
             clients,
             rng: rng,
+            args,
             paused: Default::default(),
             durability_model: Default::default(),
             unvalidated_consumers: Default::default(),
@@ -105,6 +108,9 @@ impl Cluster {
     }
 
     fn restart_server(&mut self) {
+        if self.args.no_kill {
+            return;
+        }
         let idx = self.rng.gen_range(0..self.servers.len());
         println!("restarting server {}", idx);
 
@@ -296,6 +302,8 @@ Options:
     --clients=<#>   Number of concurrent clients [default: 3].
     --servers=<#>   Number of cluster servers [default: 3].
     --steps=<#>     Number of steps to take [default: 10000].
+    --replicas=<#>  Number of replicas for the JetStream test stream [default: 1].
+    --no-kill       Do not restart servers, just pause/resume them [default: unset].
 ";
 
 struct Args {
@@ -304,6 +312,8 @@ struct Args {
     clients: u8,
     servers: u8,
     steps: u64,
+    num_replicas: usize,
+    no_kill: bool,
 }
 
 impl Default for Args {
@@ -314,6 +324,8 @@ impl Default for Args {
             clients: 3,
             servers: 3,
             steps: 10000,
+            num_replicas: 1,
+            no_kill: false,
         }
     }
 }
@@ -338,6 +350,8 @@ impl Args {
                 "clients" => args.clients = parse(&mut splits),
                 "servers" => args.servers = parse(&mut splits),
                 "steps" => args.steps = parse(&mut splits),
+                "replicas" => args.num_replicas = parse(&mut splits),
+                "no-kill" => args.no_kill = true,
                 other => panic!("unknown option: {}, {}", other, USAGE),
             }
         }
@@ -348,9 +362,10 @@ impl Args {
 fn main() {
     let args = Args::parse();
 
-    let mut cluster = Cluster::start(&args);
+    let steps = args.steps;
+    let mut cluster = Cluster::start(args);
 
-    for _ in 0..args.steps {
+    for _ in 0..steps {
         cluster.step();
     }
 }

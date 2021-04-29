@@ -15,6 +15,8 @@ Options:
     --clients=<#>   Number of concurrent clients [default: 3].
     --servers=<#>   Number of cluster servers [default: 3].
     --steps=<#>     Number of steps to take [default: 10000].
+    --replicas=<#>  Number of replicas for the JetStream test stream [default: 1].
+    --no-kill       Do not restart servers, just pause/resume them [default: unset].
 ```
 
 ## message durability model
