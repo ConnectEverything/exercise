@@ -24,7 +24,9 @@ Options:
 Durability is assessed as it relates to JetStream.
 
 * all published messages are given a unique value which is
-  monotonic from the publisher's perspective
+  monotonic from the publisher's perspective (but is often
+  scrambled up by the time it is serialized into a stream
+  and given a unique stream seq number)
 * any time a consumer receives a message, it stores the
   value and stream seq in a global map
 * if consumers ever receive different unique message values
