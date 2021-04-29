@@ -30,11 +30,9 @@ struct Cluster {
 
 impl Cluster {
     fn start(args: Args) -> Cluster {
-        let seed = args.seed.unwrap_or(rand::thread_rng().gen());
+        println!("Starting cluster exerciser with seed {}", args.seed);
 
-        println!("Starting cluster exerciser with seed {}", seed);
-
-        let rng = SeedableRng::seed_from_u64(seed);
+        let rng = SeedableRng::seed_from_u64(args.seed);
 
         let servers: Vec<Server> = (0..args.servers)
             .map(|i| server(&args.path, i as u16))
@@ -213,8 +211,9 @@ impl Cluster {
                         "different clients received \
                         different values for the same \
                         stream sequence. stream sequence: {} \
-                        value 1: {} value 2: {}",
-                        id, old_value, value
+                        first observed value: {}, second observed value: {}. \
+                        schedule replay seed: {}",
+                        id, old_value, value, self.args.seed
                     );
                 }
             }
@@ -308,7 +307,7 @@ Options:
 
 struct Args {
     path: PathBuf,
-    seed: Option<u64>,
+    seed: u64,
     clients: u8,
     servers: u8,
     steps: u64,
@@ -320,7 +319,7 @@ impl Default for Args {
     fn default() -> Args {
         Args {
             path: "nats-server".into(),
-            seed: None,
+            seed: rand::thread_rng().gen(),
             clients: 3,
             servers: 3,
             steps: 10000,
@@ -346,7 +345,7 @@ impl Args {
             let mut splits = raw_arg[2..].split('=');
             match splits.next().unwrap() {
                 "path" => args.path = parse(&mut splits),
-                "seed" => args.seed = Some(parse(&mut splits)),
+                "seed" => args.seed = parse(&mut splits),
                 "clients" => args.clients = parse(&mut splits),
                 "servers" => args.servers = parse(&mut splits),
                 "steps" => args.steps = parse(&mut splits),
