@@ -163,17 +163,13 @@ impl Cluster {
 
     fn publish(&mut self) {
         let c = self.clients.choose(&mut self.rng).unwrap();
-        println!("publishing message by client {}", c.id);
         let data = idgen().to_le_bytes();
         c.inner.nc.publish(STREAM, data).unwrap();
-        //c.inner.nc.flush().ok();
     }
 
     fn consume(&mut self) {
         let c = self.clients.choose_mut(&mut self.rng).unwrap();
-        let id = c.id;
         let proc_ret: io::Result<(u64, u64)> = c.inner.process_timeout(|msg| {
-            println!("consuming message by client {}", id);
             let info = msg.jetstream_message_info().unwrap();
 
             let id = u64::from_le_bytes((&*msg.data).try_into().unwrap());
