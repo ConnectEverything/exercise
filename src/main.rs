@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
 use std::io;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
 use std::sync::atomic::{AtomicU64, Ordering::SeqCst};
@@ -75,7 +76,7 @@ impl Cluster {
                     inner: nc
                         .create_consumer(STREAM, conf)
                         .expect("couldn't create consumer"),
-                    observed: vec![],
+                    observed: Default::default(),
                     id,
                 }
             })
@@ -161,20 +162,22 @@ impl Cluster {
         println!("publishing message by client {}", c.id);
         let data = idgen().to_le_bytes();
         c.inner.nc.publish(STREAM, data).unwrap();
+        //c.inner.nc.flush().ok();
     }
 
     fn consume(&mut self) {
         let c = self.clients.choose_mut(&mut self.rng).unwrap();
         let id = c.id;
-        let proc_ret: io::Result<u64> = c.inner.process_timeout(|msg| {
+        let proc_ret: io::Result<(u64, u64)> = c.inner.process_timeout(|msg| {
             println!("consuming message by client {}", id);
+            let info = msg.jetstream_message_info().unwrap();
 
             let id = u64::from_le_bytes((&*msg.data).try_into().unwrap());
-            Ok(id)
+            Ok((info.stream_seq, id))
         });
 
-        if let Ok(id) = proc_ret {
-            c.observed.push(id);
+        if let Ok((seq, id)) = proc_ret {
+            c.observed.insert(seq, id);
             self.unvalidated_consumers.insert(c.id);
         }
     }
@@ -185,19 +188,29 @@ impl Cluster {
 
         for id in unvalidated_consumers {
             let c = &mut self.clients[id];
-            let client_len = c.observed.len();
-            let cluster_len = self.durability_model.observed.len();
-            let shared_len = cluster_len.min(client_len);
-            assert_eq!(
-                self.durability_model.observed[..shared_len],
-                c.observed[..shared_len],
-                "observed messages must occur in the same order for all consumers",
-            );
 
-            if client_len > cluster_len {
-                self.durability_model
-                    .observed
-                    .extend_from_slice(&c.observed[shared_len..]);
+            /*
+            assert!(
+                c.observed.windows(2).all(|o| o[0] < o[1]),
+                "consume order must match publish order. consumer {} received: {:?}",
+                c.id,
+                c.observed
+            );
+            */
+
+            let observed = mem::take(&mut c.observed);
+
+            for (id, value) in observed {
+                if let Some(old_value) = self.durability_model.observed.insert(id, value) {
+                    assert_eq!(
+                        value, old_value,
+                        "different clients received \
+                        different values for the same \
+                        stream sequence. stream sequence: {} \
+                        value 1: {} value 2: {}",
+                        id, old_value, value
+                    );
+                }
             }
         }
     }
@@ -264,14 +277,14 @@ fn server<P: AsRef<Path>>(path: P, idx: u16) -> Server {
 
 struct Consumer {
     inner: nats::jetstream::Consumer,
-    observed: Vec<u64>,
+    observed: HashMap<u64, u64>,
     id: usize,
 }
 
 // every message
 #[derive(Default, Debug)]
 struct DurabilityModel {
-    observed: Vec<u64>,
+    observed: HashMap<u64, u64>,
 }
 
 const USAGE: &str = "
