@@ -39,7 +39,7 @@ impl Cluster {
             .collect();
 
         // let servers come up
-        std::thread::sleep(std::time::Duration::from_millis(1000));
+        std::thread::sleep(std::time::Duration::from_millis(2000));
 
         println!("creating testing stream {}", STREAM);
 
