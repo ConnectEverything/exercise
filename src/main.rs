@@ -34,8 +34,9 @@ impl Cluster {
 
         let rng = SeedableRng::seed_from_u64(seed);
 
-        let servers: Vec<Server> =
-            (0..args.servers).map(|i| server(&args.path, i as u16)).collect();
+        let servers: Vec<Server> = (0..args.servers)
+            .map(|i| server(&args.path, i as u16))
+            .collect();
 
         // let servers come up
         std::thread::sleep(std::time::Duration::from_millis(1000));
@@ -49,7 +50,7 @@ impl Cluster {
 
             nc.create_stream(StreamConfig {
                 name: STREAM.to_string(),
-                retention: RetentionPolicy::WorkQueue,
+                retention: RetentionPolicy::Limits,
                 ..Default::default()
             })
             .expect("couldn't create exercise_stream");
@@ -66,7 +67,6 @@ impl Cluster {
 
                 let nc = s.nc();
                 let conf = ConsumerConfig {
-                    filter_subject: Some(consumer_name.clone()),
                     durable_name: consumer_name.into(),
                     ..Default::default()
                 };
@@ -179,8 +179,7 @@ impl Cluster {
 
     fn validate(&mut self) {
         // assert all consumers have witnessed messages in the correct order
-        let unvalidated_consumers =
-            std::mem::take(&mut self.unvalidated_consumers);
+        let unvalidated_consumers = std::mem::take(&mut self.unvalidated_consumers);
 
         for id in unvalidated_consumers {
             let c = &mut self.clients[id];
