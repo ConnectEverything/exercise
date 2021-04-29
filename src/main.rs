@@ -353,6 +353,7 @@ impl Args {
                 "steps" => args.steps = parse(&mut splits),
                 "replicas" => args.num_replicas = parse(&mut splits),
                 "no-kill" => args.no_kill = true,
+                "burn-in" => args.burn_in = true,
                 other => panic!("unknown option: {}, {}", other, USAGE),
             }
         }
