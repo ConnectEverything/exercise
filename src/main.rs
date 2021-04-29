@@ -204,7 +204,7 @@ impl Cluster {
                 if let Some(old_value) = self.durability_model.observed.insert(id, value) {
                     assert_eq!(
                         value, old_value,
-                        "different clients received \
+                        "different consumers received \
                         different values for the same \
                         stream sequence. stream sequence: {} \
                         first observed value: {}, second observed value: {}. \
