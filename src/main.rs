@@ -95,8 +95,8 @@ impl Cluster {
 
     fn step(&mut self) {
         match self.rng.gen_range(0..1000) {
-            0 => self.restart_server(),
-            1..=40 => self.pause_server(),
+            0..=5 => self.restart_server(),
+            6..=40 => self.pause_server(),
             41..=90 => self.resume_server(),
             91..=200 => self.publish(),
             201..=1000 => self.consume(),
@@ -188,15 +188,6 @@ impl Cluster {
 
         for id in unvalidated_consumers {
             let c = &mut self.clients[id];
-
-            /*
-            assert!(
-                c.observed.windows(2).all(|o| o[0] < o[1]),
-                "consume order must match publish order. consumer {} received: {:?}",
-                c.id,
-                c.observed
-            );
-            */
 
             let observed = mem::take(&mut c.observed);
 
