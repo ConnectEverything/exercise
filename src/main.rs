@@ -67,6 +67,7 @@ impl Cluster {
 
                 let nc = s.nc();
                 let conf = ConsumerConfig {
+                    deliver_subject: Some(consumer_name.clone()),
                     durable_name: consumer_name.into(),
                     ..Default::default()
                 };
@@ -91,12 +92,12 @@ impl Cluster {
     }
 
     fn step(&mut self) {
-        match self.rng.gen_range(0..50) {
+        match self.rng.gen_range(0..1000) {
             0 => self.restart_server(),
-            1..=4 => self.pause_server(),
-            5..=9 => self.resume_server(),
-            10..=29 => self.publish(),
-            30..=49 => self.consume(),
+            1..=40 => self.pause_server(),
+            41..=90 => self.resume_server(),
+            91..=200 => self.publish(),
+            201..=1000 => self.consume(),
             _ => unreachable!("impossible choice"),
         }
         self.validate();
@@ -164,9 +165,10 @@ impl Cluster {
 
     fn consume(&mut self) {
         let c = self.clients.choose_mut(&mut self.rng).unwrap();
-        println!("consuming message by client {}", c.id);
-
+        let id = c.id;
         let proc_ret: io::Result<u64> = c.inner.process_timeout(|msg| {
+            println!("consuming message by client {}", id);
+
             let id = u64::from_le_bytes((&*msg.data).try_into().unwrap());
             Ok(id)
         });
