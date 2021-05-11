@@ -13,6 +13,7 @@ use nats::jetstream::{ConsumerConfig, RetentionPolicy, StreamConfig};
 
 const STREAM: &str = "exercise_stream";
 
+// generates unique (for this test run) ID
 fn idgen() -> u64 {
     static IDGEN: AtomicU64 = AtomicU64::new(0);
     IDGEN.fetch_add(1, SeqCst)
@@ -184,7 +185,8 @@ impl Cluster {
 
     fn validate(&mut self) {
         // assert all consumers have witnessed messages in the correct order
-        let unvalidated_consumers = std::mem::take(&mut self.unvalidated_consumers);
+        let unvalidated_consumers =
+            std::mem::take(&mut self.unvalidated_consumers);
 
         for id in unvalidated_consumers {
             let c = &mut self.clients[id];
@@ -192,7 +194,9 @@ impl Cluster {
             let observed = mem::take(&mut c.observed);
 
             for (id, value) in observed {
-                if let Some(old_value) = self.durability_model.observed.insert(id, value) {
+                if let Some(old_value) =
+                    self.durability_model.observed.insert(id, value)
+                {
                     if value != old_value {
                         eprintln!(
                             "
@@ -283,7 +287,9 @@ struct Consumer {
     id: usize,
 }
 
-// every message
+// we record every sid:uuid pair, and
+// ensure that consumers never observe
+// different uuid's for the same stream id.
 #[derive(Default, Debug)]
 struct DurabilityModel {
     observed: HashMap<u64, u64>,
@@ -303,6 +309,7 @@ Options:
     --burn-in       Ignore steps and run tests until we crash [default: unset].
 ";
 
+#[derive(Debug)]
 struct Args {
     path: PathBuf,
     seed: u64,
@@ -363,6 +370,9 @@ impl Args {
 
 fn main() {
     let args = Args::parse();
+
+    println!("starting fault injector with arguments:");
+    println!("{:?}", args);
 
     let steps = if args.burn_in { u64::MAX } else { args.steps };
 
