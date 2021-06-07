@@ -1,10 +1,10 @@
-version: '1.0'
+version: '3.0'
 
 services:
   server1:
     container_name: server1
     hostname: server1
-    image: [IMAGE]
+    image: server1:antithesis-latest
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.1
@@ -12,7 +12,7 @@ services:
   server2:
     container_name: server2
     hostname: server2
-    image: [IMAGE]
+    image: server2:antithesis-latest
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.2
@@ -20,7 +20,7 @@ services:
   server3:
     container_name: server3
     hostname: server3
-    image: [IMAGE]
+    image: server3:antithesis-latest
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.3
@@ -30,7 +30,7 @@ services:
   validator:
     container_name: validator
     hostname: validator
-    image: [IMAGE]
+    image: validator:antithesis-latest
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.130
