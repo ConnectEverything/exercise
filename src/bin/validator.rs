@@ -241,6 +241,10 @@ fn main() {
 
     let mut cluster = Cluster::start(args);
 
+    println!("cluster ready for fault injection");
+
+    println!("beginning correctness assertions");
+
     for _ in 0..steps {
         cluster.step();
     }
