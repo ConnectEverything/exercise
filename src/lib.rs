@@ -19,7 +19,7 @@ fn idgen() -> u64 {
     IDGEN.fetch_add(1, SeqCst)
 }
 
-struct Cluster {
+pub struct Cluster {
     clients: Vec<Consumer>,
     servers: Vec<Server>,
     paused: HashSet<usize>,
@@ -30,7 +30,7 @@ struct Cluster {
 }
 
 impl Cluster {
-    fn start(args: Args) -> Cluster {
+    pub fn start(args: Args) -> Cluster {
         println!("Starting cluster exerciser with seed {}", args.seed);
 
         let rng = SeedableRng::seed_from_u64(args.seed);
@@ -94,7 +94,7 @@ impl Cluster {
         }
     }
 
-    fn step(&mut self) {
+    pub fn step(&mut self) {
         match self.rng.gen_range(0..1000) {
             0..=5 => self.restart_server(),
             6..=40 => self.pause_server(),
@@ -185,8 +185,7 @@ impl Cluster {
 
     fn validate(&mut self) {
         // assert all consumers have witnessed messages in the correct order
-        let unvalidated_consumers =
-            std::mem::take(&mut self.unvalidated_consumers);
+        let unvalidated_consumers = mem::take(&mut self.unvalidated_consumers);
 
         for id in unvalidated_consumers {
             let c = &mut self.clients[id];
@@ -194,9 +193,7 @@ impl Cluster {
             let observed = mem::take(&mut c.observed);
 
             for (id, value) in observed {
-                if let Some(old_value) =
-                    self.durability_model.observed.insert(id, value)
-                {
+                if let Some(old_value) = self.durability_model.observed.insert(id, value) {
                     if value != old_value {
                         eprintln!(
                             "
@@ -310,15 +307,15 @@ Options:
 ";
 
 #[derive(Debug)]
-struct Args {
+pub struct Args {
     path: PathBuf,
     seed: u64,
     clients: u8,
     servers: u8,
-    steps: u64,
+    pub steps: u64,
     num_replicas: usize,
     no_kill: bool,
-    burn_in: bool,
+    pub burn_in: bool,
     start_time: std::time::Instant,
 }
 
@@ -348,7 +345,7 @@ where
 }
 
 impl Args {
-    fn parse() -> Args {
+    pub fn parse() -> Args {
         let mut args = Args::default();
         for raw_arg in std::env::args().skip(1) {
             let mut splits = raw_arg[2..].split('=');
@@ -365,20 +362,5 @@ impl Args {
             }
         }
         args
-    }
-}
-
-fn main() {
-    let args = Args::parse();
-
-    println!("starting fault injector with arguments:");
-    println!("{:?}", args);
-
-    let steps = if args.burn_in { u64::MAX } else { args.steps };
-
-    let mut cluster = Cluster::start(args);
-
-    for _ in 0..steps {
-        cluster.step();
     }
 }
