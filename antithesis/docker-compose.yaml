@@ -1,0 +1,45 @@
+version: '1.0'
+
+services:
+  server1:
+    container_name: server1
+    hostname: server1
+    image: [IMAGE]
+    networks:
+      antithesis-net:
+        ipv4_address: 10.20.20.1
+
+  server2:
+    container_name: server2
+    hostname: server2
+    image: [IMAGE]
+    networks:
+      antithesis-net:
+        ipv4_address: 10.20.20.2
+
+  server3:
+    container_name: server3
+    hostname: server3
+    image: [IMAGE]
+    networks:
+      antithesis-net:
+        ipv4_address: 10.20.20.3
+
+# Set the an IPv4 with an address of 10.20.20.130 or higher
+# to be ignored by the fault injector
+  validator:
+    container_name: validator
+    hostname: validator
+    image: [IMAGE]
+    networks:
+      antithesis-net:
+        ipv4_address: 10.20.20.130
+
+# The subnet provided here is an example
+# An alternative subnet can be used
+networks:
+  antithesis-net:
+    driver: bridge
+    ipam:
+      config:
+      - subnet: 10.20.20.0/24
