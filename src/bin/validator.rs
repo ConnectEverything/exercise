@@ -36,7 +36,8 @@ fn nc(server_number: usize) -> nats::Connection {
         server_number
     );
     loop {
-        if let Ok(nc) = nats::connect(&format!("10.20.20.{}:4222", server_number)) {
+        // we add 1 to the server number IP because the network may have 10.20.20.1 already used
+        if let Ok(nc) = nats::connect(&format!("10.20.20.{}:4222", server_number + 1)) {
             return nc;
         } else {
             std::thread::sleep(std::time::Duration::from_millis(10))

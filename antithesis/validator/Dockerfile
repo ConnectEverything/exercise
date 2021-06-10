@@ -1,3 +1,3 @@
-FROM scratch
-ADD validator /
-RUN ./validator
+FROM archlinux
+COPY ./validator /validator
+CMD ["/validator"]

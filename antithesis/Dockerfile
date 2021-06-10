@@ -3,5 +3,4 @@ COPY docker-compose.yaml /
 ADD server1 /
 ADD server2 /
 ADD server3 /
-ADD nats-server /
 ADD validator /
