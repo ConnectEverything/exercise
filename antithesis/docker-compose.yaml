@@ -7,7 +7,7 @@ services:
     image: server1:antithesis-latest
     networks:
       antithesis-net:
-        ipv4_address: 10.20.20.1
+        ipv4_address: 10.20.20.2
 
   server2:
     container_name: server2
@@ -15,7 +15,7 @@ services:
     image: server2:antithesis-latest
     networks:
       antithesis-net:
-        ipv4_address: 10.20.20.2
+        ipv4_address: 10.20.20.3
 
   server3:
     container_name: server3
@@ -23,7 +23,7 @@ services:
     image: server3:antithesis-latest
     networks:
       antithesis-net:
-        ipv4_address: 10.20.20.3
+        ipv4_address: 10.20.20.4
 
 # Set the an IPv4 with an address of 10.20.20.130 or higher
 # to be ignored by the fault injector

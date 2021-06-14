@@ -59,6 +59,25 @@ impl Cluster {
 
         println!("creating testing stream {}", STREAM);
 
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+
+            let nc = nc(1);
+
+            let _ = nc.delete_stream(STREAM);
+
+            let ret = nc.create_stream(StreamConfig {
+                num_replicas: args.num_replicas,
+                name: STREAM.to_string(),
+                retention: RetentionPolicy::Limits,
+                ..Default::default()
+            });
+
+            if ret.is_ok() {
+                break;
+            }
+        }
+
         let clients: Vec<Consumer> = (1..=SERVERS)
             .cycle()
             .enumerate()
@@ -73,30 +92,19 @@ impl Cluster {
                     durable_name: consumer_name.into(),
                     ..Default::default()
                 };
+                let mut inner = nc
+                    .create_consumer(STREAM, conf)
+                    .expect("couldn't create consumer");
+
+                inner.timeout = std::time::Duration::from_millis(10);
+
                 Consumer {
-                    inner: nc
-                        .create_consumer(STREAM, conf)
-                        .expect("couldn't create consumer"),
+                    inner,
                     observed: Default::default(),
                     id,
                 }
             })
             .collect();
-
-        {
-            let _ = clients[0].inner.nc.delete_stream(STREAM);
-
-            clients[0]
-                .inner
-                .nc
-                .create_stream(StreamConfig {
-                    num_replicas: args.num_replicas,
-                    name: STREAM.to_string(),
-                    retention: RetentionPolicy::Limits,
-                    ..Default::default()
-                })
-                .expect("couldn't create exercise_stream");
-        }
 
         Cluster {
             clients,
@@ -109,7 +117,7 @@ impl Cluster {
 
     fn step(&mut self) {
         match self.rng.gen_range(0..10) {
-            1..=2 => self.publish(),
+            0..=2 => self.publish(),
             3..=10 => self.consume(),
             _ => unreachable!("impossible choice"),
         }
@@ -235,7 +243,7 @@ impl Args {
 fn main() {
     let args = Args::parse();
 
-    println!("starting fault injector with arguments:");
+    println!("starting validator with arguments:");
     println!("{:?}", args);
 
     let steps = if args.burn_in { u64::MAX } else { args.steps };
@@ -249,4 +257,10 @@ fn main() {
     for _ in 0..steps {
         cluster.step();
     }
+
+    println!(
+        "validator found no correctness violations after \
+        executing {} operations. finished.",
+        steps
+    );
 }
