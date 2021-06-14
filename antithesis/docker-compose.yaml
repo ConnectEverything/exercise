@@ -4,7 +4,9 @@ services:
   server1:
     container_name: server1
     hostname: server1
-    image: server1:antithesis-latest
+    image: server-common:antithesis-latest
+    entrypoint: ["/nats-server"]
+    command: ["--config", "/server1.conf", "-js", "-sd", "storage"]
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.2
@@ -12,7 +14,9 @@ services:
   server2:
     container_name: server2
     hostname: server2
-    image: server2:antithesis-latest
+    image: server-common:antithesis-latest
+    entrypoint: ["/nats-server"]
+    command: ["--config", "/server2.conf", "-js", "-sd", "storage"]
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.3
@@ -20,7 +24,9 @@ services:
   server3:
     container_name: server3
     hostname: server3
-    image: server3:antithesis-latest
+    image: server-common:antithesis-latest
+    entrypoint: ["/nats-server"]
+    command: ["--config", "/server3.conf", "-js", "-sd", "storage"]
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.4

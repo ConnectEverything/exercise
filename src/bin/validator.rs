@@ -252,7 +252,11 @@ fn main() {
 
     println!("cluster ready for fault injection");
 
-    println!("beginning correctness assertions");
+    println!("workload and correctness assertions begin in 3 seconds");
+
+    std::thread::sleep(std::time::Duration::from_secs(3));
+
+    println!("starting workload and correctness assertions now");
 
     for _ in 0..steps {
         cluster.step();
