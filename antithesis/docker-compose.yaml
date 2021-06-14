@@ -37,6 +37,7 @@ services:
     container_name: validator
     hostname: validator
     image: validator:antithesis-latest
+    command: ["/validator", "--steps=1000000"]
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.130
