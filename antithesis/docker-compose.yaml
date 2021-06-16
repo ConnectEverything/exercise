@@ -38,6 +38,10 @@ services:
     hostname: validator
     image: validator:antithesis-latest
     command: ["/validator", "--steps=1000000"]
+    depends_on:
+      - server1
+      - server2
+      - server3
     networks:
       antithesis-net:
         ipv4_address: 10.20.20.130
