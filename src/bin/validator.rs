@@ -260,9 +260,9 @@ fn main() {
 
     println!("cluster ready for fault injection");
 
-    println!("workload and correctness assertions begin in 3 seconds");
+    println!("workload and correctness assertions begin in 10 seconds");
 
-    std::thread::sleep(std::time::Duration::from_secs(3));
+    std::thread::sleep(std::time::Duration::from_secs(10));
 
     println!("starting workload and correctness assertions now");
 
