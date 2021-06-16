@@ -115,22 +115,27 @@ impl Cluster {
         }
     }
 
-    fn step(&mut self) {
-        match self.rng.gen_range(0..10) {
+    fn step(&mut self) -> bool {
+        let progressed = match self.rng.gen_range(0..10) {
             0..=2 => self.publish(),
             3..=10 => self.consume(),
             _ => unreachable!("impossible choice"),
+        };
+
+        if progressed {
+            self.validate();
         }
-        self.validate();
+
+        progressed
     }
 
-    fn publish(&mut self) {
+    fn publish(&mut self) -> bool {
         let c = self.clients.choose(&mut self.rng).unwrap();
         let data = idgen().to_le_bytes();
-        c.inner.nc.publish(STREAM, data).unwrap();
+        c.inner.nc.publish(STREAM, data).is_ok()
     }
 
-    fn consume(&mut self) {
+    fn consume(&mut self) -> bool {
         let c = self.clients.choose_mut(&mut self.rng).unwrap();
         let proc_ret: io::Result<(u64, u64)> = c.inner.process_timeout(|msg| {
             let info = msg.jetstream_message_info().unwrap();
@@ -142,6 +147,9 @@ impl Cluster {
         if let Ok((seq, id)) = proc_ret {
             c.observed.insert(seq, id);
             self.unvalidated_consumers.insert(c.id);
+            true
+        } else {
+            false
         }
     }
 
@@ -258,8 +266,17 @@ fn main() {
 
     println!("starting workload and correctness assertions now");
 
-    for _ in 0..steps {
-        cluster.step();
+    let mut progressed_steps = 0;
+
+    while progressed_steps < steps {
+        let progressed = cluster.step();
+
+        if progressed {
+            progressed_steps += 1;
+            if (progressed_steps * 20) % steps == 0 {
+                println!("completed {} operations", progressed_steps);
+            }
+        }
     }
 
     println!(
